@@ -10,7 +10,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
 
 ### Milestone 1-A: Workspace bootstrap
 
-- [~] **TASK-001** — Cargo workspace setup
+- [~] **TASK-001** — Cargo workspace setup — branch `feature/TASK-001-cargo-workspace-setup` ready; PR blocked: no GitHub remote configured and `gh` CLI not available
   - root `Cargo.toml` with `[workspace]` + `[workspace.dependencies]`
   - `rust-toolchain.toml` pinned to stable
   - crate stubs: `shared-types`, `mcp-server`, `grpc-server`, `tui`, `agent-claude`, `agent-gemini`
