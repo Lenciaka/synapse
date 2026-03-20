@@ -39,7 +39,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
 
 ### Milestone 1-C: MCP Server
 
-- [ ] **TASK-005** — MCP server skeleton
+- [~] **TASK-005** — MCP server skeleton — PR #3
   - axum HTTP server บน :3000
   - rmcp tool routing
   - health check endpoint `GET /health`
