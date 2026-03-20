@@ -1,0 +1,31 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/shared-types",
+    "crates/mcp-server",
+    "crates/grpc-server",
+    "crates/tui",
+    "crates/agent-claude",
+    "crates/agent-gemini",
+]
+
+[workspace.dependencies]
+tokio        = { version = "1", features = ["full"] }
+anyhow       = "1"
+thiserror    = "1"
+serde        = { version = "1", features = ["derive"] }
+serde_json   = "1"
+axum         = "0.7"
+rmcp         = { version = "0.1", features = ["server", "transport-sse-server", "transport-streamable-http-server"] }
+async-nats   = "0.35"
+tonic        = "0.12"
+tonic-build  = "0.12"
+prost        = "0.13"
+ratatui      = "0.28"
+crossterm    = "0.28"
+redis        = { version = "0.26", features = ["tokio-comp"] }
+sqlx         = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
+rig-core     = "0.6"
+async-trait  = "0.1"
+tracing      = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

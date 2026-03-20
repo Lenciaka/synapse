@@ -1,0 +1,19 @@
+[package]
+name = "mcp-server"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "mcp-server"
+path = "src/main.rs"
+
+[dependencies]
+shared-types     = { path = "../shared-types" }
+tokio            = { workspace = true }
+anyhow           = { workspace = true }
+serde            = { workspace = true }
+serde_json       = { workspace = true }
+axum             = { workspace = true }
+async-nats       = { workspace = true }
+tracing          = { workspace = true }
+tracing-subscriber = { workspace = true }

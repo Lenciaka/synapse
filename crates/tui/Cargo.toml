@@ -1,0 +1,24 @@
+[package]
+name = "tui"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "synapse-tui"
+path = "src/main.rs"
+
+[dependencies]
+shared-types     = { path = "../shared-types" }
+tokio            = { workspace = true }
+anyhow           = { workspace = true }
+serde            = { workspace = true }
+serde_json       = { workspace = true }
+tonic            = { workspace = true }
+prost            = { workspace = true }
+ratatui          = { workspace = true }
+crossterm        = { workspace = true }
+tracing          = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[build-dependencies]
+tonic-build = { workspace = true }
