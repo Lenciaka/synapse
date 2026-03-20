@@ -13,3 +13,6 @@ async-trait  = { workspace = true }
 tracing      = { workspace = true }
 redis        = { workspace = true }
 sqlx         = { workspace = true }
+async-nats   = { workspace = true }
+bytes        = { workspace = true }
+futures-util = { workspace = true }

@@ -2128,7 +2128,10 @@ name = "shared-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-nats",
  "async-trait",
+ "bytes",
+ "futures-util",
  "redis",
  "serde",
  "serde_json",
