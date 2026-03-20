@@ -1,5 +1,7 @@
 //! Agent trait, capabilities, and registry for the Synapse system.
 
+use std::sync::Arc;
+
 use crate::task::{Task, TaskType};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -37,15 +39,17 @@ pub trait CodingAgent: Send + Sync {
     /// Returns `true` if this agent is currently reachable and able to accept work.
     async fn is_available(&self) -> bool;
 
-    /// Executes a task and returns any output or a descriptive error.
-    async fn execute(&self, task: &Task) -> Result<String, AgentError>;
+    /// Executes a task to completion.
+    ///
+    /// Returns `Ok(())` on success or an [`AgentError`] on failure.
+    async fn execute(&self, task: &Task) -> Result<(), AgentError>;
 }
 
 /// Registry of all known agents; selects the best available agent for a task
 /// using a preference-ordered fallback list.
 #[derive(Default)]
 pub struct AgentRegistry {
-    agents: Vec<Box<dyn CodingAgent>>,
+    agents: Vec<Arc<dyn CodingAgent>>,
 }
 
 impl AgentRegistry {
@@ -55,26 +59,29 @@ impl AgentRegistry {
     }
 
     /// Registers an agent with the registry.
-    pub fn register(&mut self, agent: Box<dyn CodingAgent>) {
+    pub fn register(&mut self, agent: Arc<dyn CodingAgent>) {
         self.agents.push(agent);
     }
 
-    /// Selects the first available agent from `prefer` list that supports the
-    /// given task type.  Returns an error if no suitable agent is available.
-    pub async fn select(&self, task: &Task) -> Result<&dyn CodingAgent, AgentError> {
-        for agent in &self.agents {
-            if agent
-                .capabilities()
-                .supported_task_types
-                .contains(&task.task_type)
-                && agent.is_available().await
-            {
-                return Ok(agent.as_ref());
+    /// Selects the first available agent from the `prefer` list that supports
+    /// the given task type. Agents are checked in the order they appear in
+    /// `prefer`; any agent not in `prefer` is ignored. Returns `None` when no
+    /// suitable agent is available.
+    pub async fn select(&self, task: &Task, prefer: &[&str]) -> Option<Arc<dyn CodingAgent>> {
+        for preferred_id in prefer {
+            for agent in &self.agents {
+                if agent.id() == *preferred_id
+                    && agent
+                        .capabilities()
+                        .supported_task_types
+                        .contains(&task.task_type)
+                    && agent.is_available().await
+                {
+                    return Some(Arc::clone(agent));
+                }
             }
         }
-        Err(AgentError::NoAvailableAgent {
-            task_type: task.task_type.clone(),
-        })
+        None
     }
 }
 
@@ -99,8 +106,8 @@ mod tests {
         async fn is_available(&self) -> bool {
             self.available
         }
-        async fn execute(&self, _task: &Task) -> Result<String, AgentError> {
-            Ok("done".to_string())
+        async fn execute(&self, _task: &Task) -> Result<(), AgentError> {
+            Ok(())
         }
     }
 
@@ -119,7 +126,7 @@ mod tests {
     #[tokio::test]
     async fn registry_selects_available_agent() {
         let mut reg = AgentRegistry::new();
-        reg.register(Box::new(StubAgent {
+        reg.register(Arc::new(StubAgent {
             caps: AgentCapabilities {
                 agent_id: "claude-code".to_string(),
                 supported_task_types: vec![TaskType::Code],
@@ -127,15 +134,17 @@ mod tests {
             available: true,
         }));
         let task = make_task(TaskType::Code);
-        let agent = reg.select(&task).await.unwrap();
-        assert_eq!(agent.id(), "claude-code");
+        let prefer = &["claude-code"];
+        let agent = reg.select(&task, prefer).await;
+        assert!(agent.is_some());
+        assert_eq!(agent.unwrap().id(), "claude-code");
     }
 
     #[tokio::test]
     async fn registry_skips_unavailable_and_falls_back() {
         let mut reg = AgentRegistry::new();
         // First agent: supports Code but offline
-        reg.register(Box::new(StubAgent {
+        reg.register(Arc::new(StubAgent {
             caps: AgentCapabilities {
                 agent_id: "claude-code".to_string(),
                 supported_task_types: vec![TaskType::Code],
@@ -143,7 +152,7 @@ mod tests {
             available: false,
         }));
         // Second agent: supports Code and online
-        reg.register(Box::new(StubAgent {
+        reg.register(Arc::new(StubAgent {
             caps: AgentCapabilities {
                 agent_id: "codex".to_string(),
                 supported_task_types: vec![TaskType::Code],
@@ -151,15 +160,60 @@ mod tests {
             available: true,
         }));
         let task = make_task(TaskType::Code);
-        let agent = reg.select(&task).await.unwrap();
-        assert_eq!(agent.id(), "codex");
+        let prefer = &["claude-code", "codex"];
+        let agent = reg.select(&task, prefer).await;
+        assert!(agent.is_some());
+        assert_eq!(agent.unwrap().id(), "codex");
     }
 
     #[tokio::test]
-    async fn registry_errors_when_no_agent_available() {
+    async fn registry_returns_none_when_no_agent_available() {
         let reg = AgentRegistry::new();
         let task = make_task(TaskType::Code);
-        let result = reg.select(&task).await;
-        assert!(matches!(result, Err(AgentError::NoAvailableAgent { .. })));
+        let prefer = &["claude-code"];
+        let result = reg.select(&task, prefer).await;
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn registry_respects_prefer_order() {
+        let mut reg = AgentRegistry::new();
+        reg.register(Arc::new(StubAgent {
+            caps: AgentCapabilities {
+                agent_id: "codex".to_string(),
+                supported_task_types: vec![TaskType::Code],
+            },
+            available: true,
+        }));
+        reg.register(Arc::new(StubAgent {
+            caps: AgentCapabilities {
+                agent_id: "claude-code".to_string(),
+                supported_task_types: vec![TaskType::Code],
+            },
+            available: true,
+        }));
+        let task = make_task(TaskType::Code);
+        // Even though codex was registered first, prefer list puts claude-code first
+        let prefer = &["claude-code", "codex"];
+        let agent = reg.select(&task, prefer).await;
+        assert!(agent.is_some());
+        assert_eq!(agent.unwrap().id(), "claude-code");
+    }
+
+    #[tokio::test]
+    async fn registry_ignores_agents_not_in_prefer_list() {
+        let mut reg = AgentRegistry::new();
+        reg.register(Arc::new(StubAgent {
+            caps: AgentCapabilities {
+                agent_id: "codex".to_string(),
+                supported_task_types: vec![TaskType::Code],
+            },
+            available: true,
+        }));
+        let task = make_task(TaskType::Code);
+        // prefer list does not include "codex"
+        let prefer = &["claude-code"];
+        let result = reg.select(&task, prefer).await;
+        assert!(result.is_none());
     }
 }

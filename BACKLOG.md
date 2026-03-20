@@ -30,7 +30,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
   - integration test: write/read roundtrip
   - Depends on: TASK-001
 
-- [ ] **TASK-004** — NATS setup
+- [~] **TASK-004** — NATS setup — PR #2
   - `async-nats` client wrapper ใน `shared-types`
   - publish helper: `nats.publish(subject, payload)`
   - subscribe helper: `nats.subscribe(subject)` → `Stream<Event>`
@@ -39,7 +39,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
 
 ### Milestone 1-C: MCP Server
 
-- [ ] **TASK-005** — MCP server skeleton
+- [~] **TASK-005** — MCP server skeleton — PR #3
   - axum HTTP server บน :3000
   - rmcp tool routing
   - health check endpoint `GET /health`
@@ -126,7 +126,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
 
 ### Milestone 1-F: Agent adapters (Phase 1)
 
-- [ ] **TASK-017** — shared-types: CodingAgent trait
+- [~] **TASK-017** — shared-types: CodingAgent trait
   - `CodingAgent` trait: `id()`, `capabilities()`, `is_available()`, `execute()`
   - `AgentCapabilities` struct
   - `AgentRegistry`: `register()`, `select(task)` with fallback list
