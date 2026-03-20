@@ -24,7 +24,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
 
 ### Milestone 1-B: Infrastructure
 
-- [~] **TASK-003** — Storage setup
+- [~] **TASK-003** — Storage setup — branch `feature/TASK-003-storage-setup` ready; PR blocked: no GitHub remote configured
   - Redis connection pool (`redis-rs` + connection manager) ใน `shared-types`
   - SQLite schema + `sqlx` migrations (audit_log table)
   - integration test: write/read roundtrip
