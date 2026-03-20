@@ -30,7 +30,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
   - integration test: write/read roundtrip
   - Depends on: TASK-001
 
-- [~] **TASK-004** — NATS setup
+- [~] **TASK-004** — NATS setup — PR #2
   - `async-nats` client wrapper ใน `shared-types`
   - publish helper: `nats.publish(subject, payload)`
   - subscribe helper: `nats.subscribe(subject)` → `Stream<Event>`
