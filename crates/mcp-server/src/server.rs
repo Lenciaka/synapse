@@ -72,7 +72,8 @@ async fn health() -> axum::Json<serde_json::Value> {
 /// Builds the axum [`Router`] with the MCP transport and health endpoint.
 ///
 /// The returned router can be used directly with [`axum::serve`] or in tests.
-pub fn build_router(ct: CancellationToken) -> Router {
+/// When `handler` is `None` a default handler without Redis is used.
+pub fn build_router(ct: CancellationToken, handler: Option<SynapseMcpHandler>) -> Router {
     let session_manager = Arc::new(LocalSessionManager::default());
 
     let mcp_config = StreamableHttpServerConfig {
@@ -82,8 +83,17 @@ pub fn build_router(ct: CancellationToken) -> Router {
         ..Default::default()
     };
 
-    let mcp_service =
-        StreamableHttpService::new(|| Ok(SynapseMcpHandler::new()), session_manager, mcp_config);
+    let handler = handler.unwrap_or_default();
+    let tool_router = SynapseMcpHandler::tool_router();
+
+    let mcp_service = StreamableHttpService::new(
+        move || {
+            Ok(rmcp::handler::server::router::Router::new(handler.clone())
+                .with_tools(tool_router.clone()))
+        },
+        session_manager,
+        mcp_config,
+    );
 
     Router::new().route("/health", get(health)).route(
         "/mcp",
@@ -110,7 +120,7 @@ pub async fn run(config: McpServerConfig) -> Result<(), ServerError> {
     tracing::info!("MCP server listening on {local_addr}");
 
     let ct = CancellationToken::new();
-    let app = build_router(ct.clone());
+    let app = build_router(ct.clone(), None);
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal(ct))
@@ -191,7 +201,7 @@ mod tests {
     #[tokio::test]
     async fn health_endpoint_returns_ok() {
         let ct = CancellationToken::new();
-        let app = build_router(ct);
+        let app = build_router(ct, None);
 
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
@@ -241,7 +251,7 @@ mod tests {
         let bound_addr = listener.local_addr().expect("local addr");
 
         let ct = CancellationToken::new();
-        let app = build_router(ct.clone());
+        let app = build_router(ct.clone(), None);
 
         let server = tokio::spawn(async move {
             axum::serve(listener, app)

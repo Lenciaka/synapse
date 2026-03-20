@@ -30,6 +30,14 @@ pub struct RedisPool {
     manager: ConnectionManager,
 }
 
+impl std::fmt::Debug for RedisPool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RedisPool")
+            .field("manager", &"<ConnectionManager>")
+            .finish()
+    }
+}
+
 impl RedisPool {
     /// Creates a new [`RedisPool`] using the URL in the `REDIS_URL`
     /// environment variable.
@@ -87,6 +95,22 @@ impl RedisPool {
         let mut conn = self.manager.clone();
         conn.del::<_, ()>(key).await?;
         Ok(())
+    }
+
+    /// Returns all keys matching `pattern` (a Redis glob pattern such as
+    /// `synapse:ctx:*`).
+    ///
+    /// **Note:** This uses the Redis `KEYS` command which is O(N) and should
+    /// only be used on small keyspaces. For production workloads at scale,
+    /// consider using `SCAN` instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`RedisError::Client`] variant on network or server errors.
+    pub async fn keys(&self, pattern: &str) -> Result<Vec<String>, RedisError> {
+        let mut conn = self.manager.clone();
+        let keys: Vec<String> = conn.keys(pattern).await?;
+        Ok(keys)
     }
 }
 

@@ -46,7 +46,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
   - graceful shutdown (SIGTERM)
   - Depends on: TASK-003, TASK-004
 
-- [ ] **TASK-006** — MCP tools: context
+- [~] **TASK-006** — MCP tools: context
   - `read_context(key)` → Redis GET
   - `write_context(key, value)` → Redis SET
   - `search_memory(query)` → Redis key scan (prefix match, Phase 2 upgrade to Qdrant)

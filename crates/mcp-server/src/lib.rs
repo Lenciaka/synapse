@@ -12,10 +12,11 @@
 //! ```
 //!
 //! The server integrates with NATS and Redis via [`shared_types`] for
-//! event publishing and state storage.  Tool implementations are added in
-//! subsequent tasks (TASK-006, TASK-007, TASK-008).
+//! event publishing and state storage.  Context tools are implemented in
+//! [`tools::context`]; further tools are added in TASK-007 and TASK-008.
 
 pub mod handler;
 pub mod server;
+pub mod tools;
 
 pub use server::{McpServerConfig, ServerError};
