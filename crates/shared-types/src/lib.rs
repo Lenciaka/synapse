@@ -11,7 +11,7 @@ pub mod nats;
 pub mod storage;
 pub mod task;
 
-pub use agent::{AgentCapabilities, AgentRegistry, CodingAgent};
+pub use agent::{AgentCapabilities, AgentError, AgentRegistry, CodingAgent};
 pub use nats::{NatsClient, NatsError};
 pub use storage::{AuditLogRow, RedisError, RedisPool, SqliteDb, SqliteError};
 pub use task::{Task, TaskId, TaskStatus, TaskType};
