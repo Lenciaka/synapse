@@ -16,7 +16,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
   - crate stubs: `shared-types`, `mcp-server`, `grpc-server`, `tui`, `agent-claude`, `agent-gemini`
   - `cargo build --workspace` ผ่าน (empty crates)
 
-- [ ] **TASK-002** — Proto + codegen pipeline
+- [~] **TASK-002** — Proto + codegen pipeline
   - เขียน `proto/synapse.proto` ตาม spec ใน CLAUDE.md
   - `build.rs` ใน `grpc-server` และ `tui` ที่รัน `tonic-build`
   - `cargo build -p grpc-server && cargo build -p tui` ผ่าน

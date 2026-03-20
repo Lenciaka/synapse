@@ -1,0 +1,204 @@
+// synapse.proto — source of truth for TUI ↔ gRPC communication.
+//
+// SynapseUI service: TUI connects to gRPC :3001 to query state and receive
+// a real-time event stream from the Synapse server.
+
+syntax = "proto3";
+
+package synapse;
+
+// ─── Service ────────────────────────────────────────────────────────────────
+
+/// SynapseUI exposes all RPC endpoints consumed by the TUI client.
+service SynapseUI {
+  /// Returns a list of tasks, optionally filtered by status or assigned agent.
+  rpc ListTasks (ListTasksRequest) returns (ListTasksResponse);
+
+  /// Returns details for a single task by ID.
+  rpc GetTask (GetTaskRequest) returns (GetTaskResponse);
+
+  /// Returns the list of currently registered agents.
+  rpc ListAgents (ListAgentsRequest) returns (ListAgentsResponse);
+
+  /// Approves a pending human checkpoint (e.g. spec approval, PR merge).
+  rpc ApproveCheckpoint (ApproveCheckpointRequest) returns (ApproveCheckpointResponse);
+
+  /// Pauses a running agent (it will stop picking up new tasks).
+  rpc PauseAgent (PauseAgentRequest) returns (PauseAgentResponse);
+
+  /// Resumes a paused agent.
+  rpc ResumeAgent (ResumeAgentRequest) returns (ResumeAgentResponse);
+
+  /// Opens a server-sent event stream; delivers real-time events to the TUI.
+  rpc SubscribeEvents (SubscribeRequest) returns (stream Event);
+}
+
+// ─── Shared enums ───────────────────────────────────────────────────────────
+
+/// Lifecycle state of a task.
+enum TaskStatus {
+  TASK_STATUS_UNSPECIFIED = 0;
+  TASK_STATUS_PENDING     = 1;
+  TASK_STATUS_IN_PROGRESS = 2;
+  TASK_STATUS_IN_REVIEW   = 3;
+  TASK_STATUS_DONE        = 4;
+  TASK_STATUS_BLOCKED     = 5;
+}
+
+/// Online / operational state of an agent.
+enum AgentStatus {
+  AGENT_STATUS_UNSPECIFIED = 0;
+  AGENT_STATUS_ONLINE      = 1;
+  AGENT_STATUS_PAUSED      = 2;
+  AGENT_STATUS_OFFLINE     = 3;
+}
+
+// ─── Domain messages ────────────────────────────────────────────────────────
+
+/// A unit of work managed by Synapse.
+message Task {
+  string      id          = 1;
+  string      title       = 2;
+  string      description = 3;
+  TaskStatus  status      = 4;
+  string      task_type   = 5;
+  string      assigned_to = 6;
+  string      notes       = 7;
+}
+
+/// A registered agent known to the Synapse server.
+message Agent {
+  string      id     = 1;
+  string      name   = 2;
+  AgentStatus status = 3;
+}
+
+// ─── ListTasks ───────────────────────────────────────────────────────────────
+
+/// Request message for ListTasks.
+message ListTasksRequest {
+  /// Optional filter: only return tasks with this status.
+  /// Leave as UNSPECIFIED to return all tasks.
+  TaskStatus status_filter = 1;
+
+  /// Optional filter: only return tasks assigned to this agent ID.
+  string assigned_to_filter = 2;
+}
+
+/// Response message for ListTasks.
+message ListTasksResponse {
+  repeated Task tasks = 1;
+}
+
+// ─── GetTask ─────────────────────────────────────────────────────────────────
+
+/// Request message for GetTask.
+message GetTaskRequest {
+  string id = 1;
+}
+
+/// Response message for GetTask.
+message GetTaskResponse {
+  Task task = 1;
+}
+
+// ─── ListAgents ──────────────────────────────────────────────────────────────
+
+/// Request message for ListAgents.
+message ListAgentsRequest {}
+
+/// Response message for ListAgents.
+message ListAgentsResponse {
+  repeated Agent agents = 1;
+}
+
+// ─── ApproveCheckpoint ───────────────────────────────────────────────────────
+
+/// Request message for ApproveCheckpoint.
+message ApproveCheckpointRequest {
+  /// ID of the checkpoint to approve.
+  string checkpoint_id = 1;
+}
+
+/// Response message for ApproveCheckpoint.
+message ApproveCheckpointResponse {
+  bool success = 1;
+}
+
+// ─── PauseAgent ──────────────────────────────────────────────────────────────
+
+/// Request message for PauseAgent.
+message PauseAgentRequest {
+  string agent_id = 1;
+}
+
+/// Response message for PauseAgent.
+message PauseAgentResponse {
+  bool success = 1;
+}
+
+// ─── ResumeAgent ─────────────────────────────────────────────────────────────
+
+/// Request message for ResumeAgent.
+message ResumeAgentRequest {
+  string agent_id = 1;
+}
+
+/// Response message for ResumeAgent.
+message ResumeAgentResponse {
+  bool success = 1;
+}
+
+// ─── SubscribeEvents ─────────────────────────────────────────────────────────
+
+/// Request message for SubscribeEvents.
+message SubscribeRequest {}
+
+/// A real-time event streamed from Synapse to the TUI.
+message Event {
+  oneof payload {
+    TaskStatusChanged   task_status_changed   = 1;
+    AgentLogLine        agent_log_line        = 2;
+    AgentStatusChanged  agent_status_changed  = 3;
+    CheckpointRequired  checkpoint_required   = 4;
+    PrOpened            pr_opened             = 5;
+  }
+}
+
+/// Fired when a task's status transitions to a new state.
+message TaskStatusChanged {
+  string     task_id    = 1;
+  TaskStatus old_status = 2;
+  TaskStatus new_status = 3;
+}
+
+/// A single line of log output emitted by an agent.
+message AgentLogLine {
+  string agent_id  = 1;
+  string task_id   = 2;
+  string line      = 3;
+  /// Unix epoch millis.
+  int64  timestamp = 4;
+}
+
+/// Fired when an agent's online/paused/offline state changes.
+message AgentStatusChanged {
+  string      agent_id   = 1;
+  AgentStatus old_status = 2;
+  AgentStatus new_status = 3;
+}
+
+/// Fired when a task reaches a point that requires human approval.
+message CheckpointRequired {
+  string checkpoint_id = 1;
+  string task_id       = 2;
+  /// Human-readable description of what needs approval.
+  string description   = 3;
+}
+
+/// Fired when an agent opens a pull request.
+message PrOpened {
+  string task_id   = 1;
+  int32  pr_number = 2;
+  string pr_url    = 3;
+}
