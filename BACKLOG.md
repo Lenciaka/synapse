@@ -126,7 +126,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
 
 ### Milestone 1-F: Agent adapters (Phase 1)
 
-- [ ] **TASK-017** — shared-types: CodingAgent trait
+- [~] **TASK-017** — shared-types: CodingAgent trait
   - `CodingAgent` trait: `id()`, `capabilities()`, `is_available()`, `execute()`
   - `AgentCapabilities` struct
   - `AgentRegistry`: `register()`, `select(task)` with fallback list
