@@ -23,8 +23,8 @@ tonic-build  = "0.12"
 prost        = "0.13"
 ratatui      = "0.28"
 crossterm    = "0.28"
-redis        = { version = "0.26", features = ["tokio-comp"] }
-sqlx         = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
+redis        = { version = "0.26", features = ["tokio-comp", "connection-manager"] }
+sqlx         = { version = "0.8", features = ["sqlite", "runtime-tokio", "migrate"] }
 rig-core     = "0.6"
 async-trait  = "0.1"
 tracing      = "0.1"
