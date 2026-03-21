@@ -10,13 +10,13 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
 
 ### Milestone 1-A: Workspace bootstrap
 
-- [~] **TASK-001** — Cargo workspace setup — branch `feature/TASK-001-cargo-workspace-setup` ready; PR blocked: no GitHub remote configured and `gh` CLI not available
+- [x] **TASK-001** — Cargo workspace setup — merged into develop
   - root `Cargo.toml` with `[workspace]` + `[workspace.dependencies]`
   - `rust-toolchain.toml` pinned to stable
   - crate stubs: `shared-types`, `mcp-server`, `grpc-server`, `tui`, `agent-claude`, `agent-gemini`
   - `cargo build --workspace` ผ่าน (empty crates)
 
-- [~] **TASK-002** — Proto + codegen pipeline — branch `feature/TASK-002-proto-codegen-pipeline` ready; PR blocked: no GitHub remote configured and `gh` CLI not available
+- [x] **TASK-002** — Proto + codegen pipeline — merged into develop
   - เขียน `proto/synapse.proto` ตาม spec ใน CLAUDE.md
   - `build.rs` ใน `grpc-server` และ `tui` ที่รัน `tonic-build`
   - `cargo build -p grpc-server && cargo build -p tui` ผ่าน
@@ -24,13 +24,13 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
 
 ### Milestone 1-B: Infrastructure
 
-- [~] **TASK-003** — Storage setup — branch `feature/TASK-003-storage-setup` ready; PR blocked: no GitHub remote configured
+- [x] **TASK-003** — Storage setup — merged into develop
   - Redis connection pool (`redis-rs` + connection manager) ใน `shared-types`
   - SQLite schema + `sqlx` migrations (audit_log table)
   - integration test: write/read roundtrip
   - Depends on: TASK-001
 
-- [~] **TASK-004** — NATS setup — PR #2
+- [x] **TASK-004** — NATS setup — PR #2 merged
   - `async-nats` client wrapper ใน `shared-types`
   - publish helper: `nats.publish(subject, payload)`
   - subscribe helper: `nats.subscribe(subject)` → `Stream<Event>`
@@ -39,14 +39,14 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
 
 ### Milestone 1-C: MCP Server
 
-- [~] **TASK-005** — MCP server skeleton — PR #3
+- [x] **TASK-005** — MCP server skeleton — PR #3 merged
   - axum HTTP server บน :3000
   - rmcp tool routing
   - health check endpoint `GET /health`
   - graceful shutdown (SIGTERM)
   - Depends on: TASK-003, TASK-004
 
-- [ ] **TASK-006** — MCP tools: context
+- [~] **TASK-006** — MCP tools: context — PR #5 (QA approved)
   - `read_context(key)` → Redis GET
   - `write_context(key, value)` → Redis SET
   - `search_memory(query)` → Redis key scan (prefix match, Phase 2 upgrade to Qdrant)
@@ -126,7 +126,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
 
 ### Milestone 1-F: Agent adapters (Phase 1)
 
-- [~] **TASK-017** — shared-types: CodingAgent trait
+- [~] **TASK-017** — shared-types: CodingAgent trait — PR #4 (QA approved)
   - `CodingAgent` trait: `id()`, `capabilities()`, `is_available()`, `execute()`
   - `AgentCapabilities` struct
   - `AgentRegistry`: `register()`, `select(task)` with fallback list
