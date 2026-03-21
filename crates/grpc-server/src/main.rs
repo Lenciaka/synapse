@@ -1,13 +1,19 @@
-//! gRPC server binary — tonic on :3001.
+//! gRPC server binary -- tonic on a configurable port (default :3001).
 //!
-//! Subscribes to NATS and streams events to the TUI client.
-//! Full service implementation is done in TASK-009.
+//! Implements the `SynapseUI` service for the TUI client and streams events
+//! from NATS.
 
-/// Proto-generated types and server traits for the `SynapseUI` gRPC service.
-pub mod synapse {
-    tonic::include_proto!("synapse");
-}
+use grpc_server::{GrpcServerConfig, ServerError};
 
-fn main() {
-    // Stub — full implementation in TASK-009.
+#[tokio::main]
+async fn main() -> Result<(), ServerError> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "info,grpc_server=debug".into()),
+        )
+        .init();
+
+    let config = GrpcServerConfig::from_env();
+    grpc_server::server::run(config).await
 }

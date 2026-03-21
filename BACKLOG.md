@@ -69,7 +69,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
 
 ### Milestone 1-D: gRPC Server
 
-- [ ] **TASK-009** — gRPC server skeleton
+- [~] **TASK-009** — gRPC server skeleton
   - tonic server บน :3001
   - implement `SynapseUI` service stub (return empty/unimplemented)
   - graceful shutdown
