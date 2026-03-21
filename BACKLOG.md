@@ -146,7 +146,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
 
 ### Milestone 1-G: Integration + CI
 
-- [ ] **TASK-020** — End-to-end integration test (Docker)
+- [~] **TASK-020** — End-to-end integration test (Docker) — PR #6 (draft, infra files only)
   - `crates/mock-agent/` — Rust binary ที่ทำ agent loop จริงแต่ไม่เรียก LLM
     - poll `list_tasks()` → `update_task(in_progress)` → sleep 1s → `update_task(done)`
     - env: `MCP_URL`, `AGENT_ID`, `AGENT_ROLE`
