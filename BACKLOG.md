@@ -53,7 +53,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
   - unit tests: roundtrip ทุก tool
   - Depends on: TASK-005
 
-- [~] **TASK-007** — MCP tools: tasks
+- [~] **TASK-007** — MCP tools: tasks — PR #7
   - `list_tasks(status?, assigned_to?)` → query Redis task store
   - `update_task(id, status, notes?)` → update + publish `synapse.task.status_changed`
   - Task state machine: `pending → in_progress → in_review → done | blocked`
