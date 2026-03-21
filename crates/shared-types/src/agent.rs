@@ -113,6 +113,8 @@ mod tests {
             task_type,
             assigned_to: None,
             notes: None,
+            created_at: 0,
+            updated_at: 0,
         }
     }
 

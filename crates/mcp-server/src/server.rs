@@ -17,6 +17,7 @@ use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 
 use crate::handler::SynapseMcpHandler;
+use crate::tools::tasks::TaskStore;
 
 /// Default port the MCP server listens on.
 const DEFAULT_PORT: u16 = 3000;
@@ -36,6 +37,14 @@ pub enum ServerError {
     /// The server encountered an IO error while serving.
     #[error("server IO error: {0}")]
     Serve(#[from] std::io::Error),
+
+    /// Failed to connect to Redis.
+    #[error("redis connection error: {0}")]
+    Redis(#[from] shared_types::storage::RedisError),
+
+    /// Failed to connect to NATS.
+    #[error("nats connection error: {0}")]
+    Nats(#[from] shared_types::nats::NatsError),
 }
 
 /// Configuration for the MCP HTTP server.
@@ -71,8 +80,11 @@ async fn health() -> axum::Json<serde_json::Value> {
 
 /// Builds the axum [`Router`] with the MCP transport and health endpoint.
 ///
+/// The `handler` is the pre-configured [`SynapseMcpHandler`] that will handle
+/// all incoming MCP tool calls.
+///
 /// The returned router can be used directly with [`axum::serve`] or in tests.
-pub fn build_router(ct: CancellationToken) -> Router {
+pub fn build_router(handler: SynapseMcpHandler, ct: CancellationToken) -> Router {
     let session_manager = Arc::new(LocalSessionManager::default());
 
     let mcp_config = StreamableHttpServerConfig {
@@ -83,7 +95,7 @@ pub fn build_router(ct: CancellationToken) -> Router {
     };
 
     let mcp_service =
-        StreamableHttpService::new(|| Ok(SynapseMcpHandler::new()), session_manager, mcp_config);
+        StreamableHttpService::new(move || Ok(handler.clone()), session_manager, mcp_config);
 
     Router::new().route("/health", get(health)).route(
         "/mcp",
@@ -93,14 +105,33 @@ pub fn build_router(ct: CancellationToken) -> Router {
 
 /// Runs the MCP HTTP server until a SIGTERM or SIGINT signal is received.
 ///
-/// This is the main entry point for the server binary.
+/// This is the main entry point for the server binary.  It connects to Redis
+/// and NATS (via environment variables), constructs a [`SynapseMcpHandler`],
+/// and starts serving on the configured port.
 ///
 /// # Errors
 ///
-/// Returns [`ServerError::Bind`] when the TCP listener cannot be bound, or
-/// [`ServerError::Serve`] on runtime IO errors.
+/// Returns [`ServerError::Bind`] when the TCP listener cannot be bound,
+/// [`ServerError::Redis`] or [`ServerError::Nats`] on connection failures,
+/// or [`ServerError::Serve`] on runtime IO errors.
 pub async fn run(config: McpServerConfig) -> Result<(), ServerError> {
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
+
+    // Connect to Redis and NATS.
+    let redis = shared_types::storage::RedisPool::from_env().await?;
+    let nats = match shared_types::nats::NatsClient::from_env().await {
+        Ok(client) => {
+            tracing::info!("connected to NATS");
+            Some(Arc::new(client))
+        }
+        Err(e) => {
+            tracing::warn!("NATS not available ({e}), task events will not be published");
+            None
+        }
+    };
+
+    let task_store = TaskStore::new(redis, nats);
+    let handler = SynapseMcpHandler::new(task_store);
 
     let listener = TcpListener::bind(addr)
         .await
@@ -110,7 +141,7 @@ pub async fn run(config: McpServerConfig) -> Result<(), ServerError> {
     tracing::info!("MCP server listening on {local_addr}");
 
     let ct = CancellationToken::new();
-    let app = build_router(ct.clone());
+    let app = build_router(handler, ct.clone());
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal(ct))
@@ -155,6 +186,16 @@ mod tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+    /// Creates a test handler that uses a live Redis connection.
+    /// Tests that use this are marked `#[ignore]`.
+    async fn test_handler() -> SynapseMcpHandler {
+        let redis = shared_types::storage::RedisPool::connect("redis://127.0.0.1:6379")
+            .await
+            .expect("connect to Redis for test");
+        let task_store = TaskStore::new(redis, None);
+        SynapseMcpHandler::new(task_store)
+    }
+
     #[test]
     fn config_default_port() {
         let cfg = McpServerConfig::default();
@@ -189,9 +230,11 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires live Redis at redis://127.0.0.1:6379"]
     async fn health_endpoint_returns_ok() {
+        let handler = test_handler().await;
         let ct = CancellationToken::new();
-        let app = build_router(ct);
+        let app = build_router(handler, ct);
 
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
@@ -233,7 +276,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires live Redis at redis://127.0.0.1:6379"]
     async fn server_starts_and_shuts_down() {
+        let handler = test_handler().await;
         let config = McpServerConfig { port: 0 };
         let addr = SocketAddr::from(([127, 0, 0, 1], 0));
 
@@ -241,7 +286,7 @@ mod tests {
         let bound_addr = listener.local_addr().expect("local addr");
 
         let ct = CancellationToken::new();
-        let app = build_router(ct.clone());
+        let app = build_router(handler, ct.clone());
 
         let server = tokio::spawn(async move {
             axum::serve(listener, app)
