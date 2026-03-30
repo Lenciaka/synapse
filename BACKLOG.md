@@ -139,7 +139,7 @@ Goal: MCP server รับ agent ได้, TUI ใช้งานได้, Cla
   - agent poll loop: `list_tasks` → `execute` → `update_task`
   - Depends on: TASK-017, TASK-007
 
-- [ ] **TASK-019** — agent-gemini: Gemini CLI adapter
+- [x] **TASK-019** — agent-gemini: Gemini CLI adapter · PR #9
   - impl `CodingAgent` for Gemini CLI
   - same poll loop pattern as TASK-018
   - Depends on: TASK-017, TASK-007
