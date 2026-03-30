@@ -4,3 +4,4 @@
 //! rmcp [`ToolRouter`] and dispatched via the MCP `tools/call` endpoint.
 
 pub mod context;
+pub mod tasks;
