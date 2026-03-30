@@ -5,6 +5,7 @@
 //! binds the TCP listener, and runs until a shutdown signal is received.
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
@@ -21,6 +22,14 @@ pub enum ServerError {
     /// Failed to start the tonic transport server.
     #[error("gRPC transport error: {0}")]
     Transport(#[from] tonic::transport::Error),
+
+    /// Failed to connect to Redis.
+    #[error("redis connection error: {0}")]
+    Redis(#[from] shared_types::storage::RedisError),
+
+    /// Failed to connect to NATS.
+    #[error("nats connection error: {0}")]
+    Nats(#[from] shared_types::nats::NatsError),
 }
 
 /// Configuration for the gRPC server.
@@ -60,11 +69,24 @@ impl GrpcServerConfig {
 pub async fn run(config: GrpcServerConfig) -> Result<(), ServerError> {
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
 
-    let ct = CancellationToken::new();
-    let service = SynapseUiService::new();
+    // Connect to Redis (required) and NATS (optional — warn and continue if unavailable).
+    let redis = shared_types::storage::RedisPool::from_env().await?;
+    let nats = match shared_types::nats::NatsClient::from_env().await {
+        Ok(client) => {
+            tracing::info!("connected to NATS");
+            Some(Arc::new(client))
+        }
+        Err(e) => {
+            tracing::warn!("NATS not available ({e}), events will not be streamed");
+            None
+        }
+    };
+
+    let service = SynapseUiService::new(redis, nats);
 
     tracing::info!("gRPC server listening on {addr}");
 
+    let ct = CancellationToken::new();
     tonic::transport::Server::builder()
         .add_service(SynapseUiServer::new(service))
         .serve_with_shutdown(addr, shutdown_signal(ct))
@@ -158,6 +180,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires live Redis at REDIS_URL or redis://127.0.0.1:6379"]
     async fn server_starts_and_shuts_down() {
         // Use port 0 so the OS assigns an ephemeral port.
         // We run the server briefly and then cancel it.
@@ -165,7 +188,12 @@ mod tests {
         let ct = CancellationToken::new();
         let ct_clone = ct.clone();
 
-        let service = SynapseUiService::new();
+        let url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+        let redis = shared_types::storage::RedisPool::connect(&url)
+            .await
+            .expect("connect to Redis for test");
+        let service = SynapseUiService::new(redis, None);
 
         let server = tokio::spawn(async move {
             tonic::transport::Server::builder()

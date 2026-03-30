@@ -4,6 +4,7 @@
 //! filled in by subsequent tasks (TASK-010, TASK-011, TASK-012).
 
 use std::pin::Pin;
+use std::sync::Arc;
 
 use futures_util::Stream;
 use tonic::{Request, Response, Status};
@@ -12,15 +13,30 @@ use crate::proto;
 
 /// Stub implementation of the `SynapseUI` gRPC service.
 ///
-/// Each RPC method returns [`Status::unimplemented`] until the corresponding
-/// task is completed.
-#[derive(Debug, Default)]
-pub struct SynapseUiService;
+/// Holds handles to Redis and NATS so that subsequent tasks (TASK-010,
+/// TASK-011, TASK-012) can use them without changing the constructor
+/// signature.  Each RPC method returns [`Status::unimplemented`] until the
+/// corresponding task is completed.
+#[derive(Clone)]
+pub struct SynapseUiService {
+    /// Redis connection pool for task and agent state queries.
+    // Used by TASK-010 (ListTasks, GetTask, ListAgents).
+    #[allow(dead_code)]
+    pub(crate) redis: shared_types::storage::RedisPool,
+    /// Optional NATS client for publishing checkpoint/agent events.
+    // Used by TASK-011 (ApproveCheckpoint, PauseAgent, ResumeAgent).
+    #[allow(dead_code)]
+    pub(crate) nats: Option<Arc<shared_types::nats::NatsClient>>,
+}
 
 impl SynapseUiService {
-    /// Creates a new [`SynapseUiService`].
-    pub fn new() -> Self {
-        Self
+    /// Creates a new [`SynapseUiService`] with the given Redis pool and
+    /// optional NATS client.
+    pub fn new(
+        redis: shared_types::storage::RedisPool,
+        nats: Option<Arc<shared_types::nats::NatsClient>>,
+    ) -> Self {
+        Self { redis, nats }
     }
 }
 
@@ -88,8 +104,13 @@ mod tests {
     use super::*;
     use crate::proto::synapse_ui_server::SynapseUi;
 
-    fn service() -> SynapseUiService {
-        SynapseUiService::new()
+    async fn service() -> SynapseUiService {
+        let url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+        let redis = shared_types::storage::RedisPool::connect(&url)
+            .await
+            .expect("connect to Redis for test");
+        SynapseUiService::new(redis, None)
     }
 
     /// Helper to assert that a gRPC result is an `Unimplemented` status.
@@ -99,56 +120,70 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires live Redis at REDIS_URL or redis://127.0.0.1:6379"]
     async fn list_tasks_returns_unimplemented() {
         let result = service()
+            .await
             .list_tasks(Request::new(proto::ListTasksRequest::default()))
             .await;
         assert_unimplemented(result);
     }
 
     #[tokio::test]
+    #[ignore = "requires live Redis at REDIS_URL or redis://127.0.0.1:6379"]
     async fn get_task_returns_unimplemented() {
         let result = service()
+            .await
             .get_task(Request::new(proto::GetTaskRequest::default()))
             .await;
         assert_unimplemented(result);
     }
 
     #[tokio::test]
+    #[ignore = "requires live Redis at REDIS_URL or redis://127.0.0.1:6379"]
     async fn list_agents_returns_unimplemented() {
         let result = service()
+            .await
             .list_agents(Request::new(proto::ListAgentsRequest::default()))
             .await;
         assert_unimplemented(result);
     }
 
     #[tokio::test]
+    #[ignore = "requires live Redis at REDIS_URL or redis://127.0.0.1:6379"]
     async fn approve_checkpoint_returns_unimplemented() {
         let result = service()
+            .await
             .approve_checkpoint(Request::new(proto::ApproveCheckpointRequest::default()))
             .await;
         assert_unimplemented(result);
     }
 
     #[tokio::test]
+    #[ignore = "requires live Redis at REDIS_URL or redis://127.0.0.1:6379"]
     async fn pause_agent_returns_unimplemented() {
         let result = service()
+            .await
             .pause_agent(Request::new(proto::PauseAgentRequest::default()))
             .await;
         assert_unimplemented(result);
     }
 
     #[tokio::test]
+    #[ignore = "requires live Redis at REDIS_URL or redis://127.0.0.1:6379"]
     async fn resume_agent_returns_unimplemented() {
         let result = service()
+            .await
             .resume_agent(Request::new(proto::ResumeAgentRequest::default()))
             .await;
         assert_unimplemented(result);
     }
 
     #[tokio::test]
+    #[ignore = "requires live Redis at REDIS_URL or redis://127.0.0.1:6379"]
     async fn subscribe_events_returns_unimplemented() {
         let result = service()
+            .await
             .subscribe_events(Request::new(proto::SubscribeRequest::default()))
             .await;
         match result {
