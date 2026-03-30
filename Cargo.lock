@@ -2762,7 +2762,6 @@ dependencies = [
  "bytes",
  "futures-util",
  "redis",
- "schemars",
  "serde",
  "serde_json",
  "sqlx",

@@ -120,6 +120,8 @@ mod tests {
             task_type,
             assigned_to: None,
             notes: None,
+            created_at: 1_700_000_000,
+            updated_at: 1_700_000_000,
         }
     }
 
