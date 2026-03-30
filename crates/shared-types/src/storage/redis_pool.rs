@@ -88,6 +88,21 @@ impl RedisPool {
         conn.del::<_, ()>(key).await?;
         Ok(())
     }
+
+    /// Returns all keys matching the given `pattern`.
+    ///
+    /// Uses the Redis `KEYS` command.  This is acceptable for small datasets
+    /// (hundreds of keys); for production workloads with millions of keys
+    /// consider switching to `SCAN`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`RedisError::Client`] variant on network or server errors.
+    pub async fn keys(&self, pattern: &str) -> Result<Vec<String>, RedisError> {
+        let mut conn = self.manager.clone();
+        let keys: Vec<String> = conn.keys(pattern).await?;
+        Ok(keys)
+    }
 }
 
 #[cfg(test)]

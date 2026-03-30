@@ -1,12 +1,20 @@
 //! Task domain types for the Synapse system.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Unique identifier for a task.
 pub type TaskId = String;
 
 /// The current lifecycle state of a [`Task`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// Valid transitions:
+/// - `Pending` -> `InProgress`, `Blocked`
+/// - `InProgress` -> `InReview`, `Done`, `Blocked`
+/// - `InReview` -> `Done`, `Blocked`, `InProgress`
+/// - `Blocked` -> `Pending`, `InProgress`
+/// - `Done` is terminal
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
     /// Waiting to be picked up by an agent.
@@ -21,8 +29,35 @@ pub enum TaskStatus {
     Blocked,
 }
 
+impl TaskStatus {
+    /// Returns `true` if transitioning from `self` to `target` is a valid
+    /// state machine transition.
+    ///
+    /// The task state machine allows:
+    /// - `Pending` -> `InProgress` | `Blocked`
+    /// - `InProgress` -> `InReview` | `Done` | `Blocked`
+    /// - `InReview` -> `Done` | `Blocked` | `InProgress`
+    /// - `Blocked` -> `Pending` | `InProgress`
+    /// - `Done` is a terminal state (no outbound transitions)
+    pub fn can_transition_to(&self, target: &TaskStatus) -> bool {
+        matches!(
+            (self, target),
+            (TaskStatus::Pending, TaskStatus::InProgress)
+                | (TaskStatus::Pending, TaskStatus::Blocked)
+                | (TaskStatus::InProgress, TaskStatus::InReview)
+                | (TaskStatus::InProgress, TaskStatus::Done)
+                | (TaskStatus::InProgress, TaskStatus::Blocked)
+                | (TaskStatus::InReview, TaskStatus::Done)
+                | (TaskStatus::InReview, TaskStatus::Blocked)
+                | (TaskStatus::InReview, TaskStatus::InProgress)
+                | (TaskStatus::Blocked, TaskStatus::Pending)
+                | (TaskStatus::Blocked, TaskStatus::InProgress)
+        )
+    }
+}
+
 /// The category of work a task represents.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskType {
     /// A coding / implementation task.
@@ -34,7 +69,7 @@ pub enum TaskType {
 }
 
 /// A unit of work assigned to an agent.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Task {
     /// Unique task identifier.
     pub id: TaskId,
@@ -50,6 +85,10 @@ pub struct Task {
     pub assigned_to: Option<String>,
     /// Optional human-readable notes (used for blockers, review comments, etc.).
     pub notes: Option<String>,
+    /// Unix timestamp (seconds) when the task was created.
+    pub created_at: i64,
+    /// Unix timestamp (seconds) when the task was last updated.
+    pub updated_at: i64,
 }
 
 #[cfg(test)]
@@ -66,11 +105,15 @@ mod tests {
             task_type: TaskType::Code,
             assigned_to: Some("claude-code".to_string()),
             notes: None,
+            created_at: 1_700_000_000,
+            updated_at: 1_700_000_000,
         };
         let json = serde_json::to_string(&task).unwrap();
         let decoded: Task = serde_json::from_str(&json).unwrap();
         assert_eq!(task.id, decoded.id);
         assert_eq!(task.status, decoded.status);
+        assert_eq!(decoded.created_at, 1_700_000_000);
+        assert_eq!(decoded.updated_at, 1_700_000_000);
     }
 
     #[test]
@@ -83,5 +126,43 @@ mod tests {
             serde_json::from_str::<TaskStatus>("\"in_review\"").unwrap(),
             TaskStatus::InReview
         );
+    }
+
+    #[test]
+    fn valid_transitions() {
+        // Pending -> InProgress, Blocked
+        assert!(TaskStatus::Pending.can_transition_to(&TaskStatus::InProgress));
+        assert!(TaskStatus::Pending.can_transition_to(&TaskStatus::Blocked));
+
+        // InProgress -> InReview, Done, Blocked
+        assert!(TaskStatus::InProgress.can_transition_to(&TaskStatus::InReview));
+        assert!(TaskStatus::InProgress.can_transition_to(&TaskStatus::Done));
+        assert!(TaskStatus::InProgress.can_transition_to(&TaskStatus::Blocked));
+
+        // InReview -> Done, Blocked, InProgress
+        assert!(TaskStatus::InReview.can_transition_to(&TaskStatus::Done));
+        assert!(TaskStatus::InReview.can_transition_to(&TaskStatus::Blocked));
+        assert!(TaskStatus::InReview.can_transition_to(&TaskStatus::InProgress));
+
+        // Blocked -> Pending, InProgress
+        assert!(TaskStatus::Blocked.can_transition_to(&TaskStatus::Pending));
+        assert!(TaskStatus::Blocked.can_transition_to(&TaskStatus::InProgress));
+    }
+
+    #[test]
+    fn invalid_transitions() {
+        // Done is terminal
+        assert!(!TaskStatus::Done.can_transition_to(&TaskStatus::Pending));
+        assert!(!TaskStatus::Done.can_transition_to(&TaskStatus::InProgress));
+        assert!(!TaskStatus::Done.can_transition_to(&TaskStatus::InReview));
+        assert!(!TaskStatus::Done.can_transition_to(&TaskStatus::Blocked));
+
+        // Self-transitions are not allowed
+        assert!(!TaskStatus::Pending.can_transition_to(&TaskStatus::Pending));
+        assert!(!TaskStatus::InProgress.can_transition_to(&TaskStatus::InProgress));
+
+        // Skip transitions
+        assert!(!TaskStatus::Pending.can_transition_to(&TaskStatus::Done));
+        assert!(!TaskStatus::Pending.can_transition_to(&TaskStatus::InReview));
     }
 }
