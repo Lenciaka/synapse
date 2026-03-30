@@ -1,0 +1,68 @@
+# Synapse local dev environment
+# Usage: docker compose -f infra/docker/docker-compose.yml up -d
+
+services:
+  nats:
+    image: nats:2.10-alpine
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - ../nats/nats.conf:/etc/nats/nats.conf:ro
+    command: ["--config", "/etc/nats/nats.conf"]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  mcp-server:
+    build:
+      context: ../../
+      dockerfile: infra/docker/Dockerfile.mcp-server
+    ports:
+      - "3000:3000"
+    environment:
+      MCP_PORT: "3000"
+      NATS_URL: "nats://nats:4222"
+      REDIS_URL: "redis://redis:6379"
+      RUST_LOG: "synapse=info,tower=warn"
+    depends_on:
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  grpc-server:
+    build:
+      context: ../../
+      dockerfile: infra/docker/Dockerfile.grpc-server
+    ports:
+      - "3001:3001"
+    environment:
+      GRPC_PORT: "3001"
+      NATS_URL: "nats://nats:4222"
+      REDIS_URL: "redis://redis:6379"
+      RUST_LOG: "synapse=info,tower=warn"
+    depends_on:
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis-data:
